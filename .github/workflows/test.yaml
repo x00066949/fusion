@@ -1,0 +1,40 @@
+name: test-cockroachdb
+on:
+  push:
+    paths:
+      - databases/cockroachdb/**
+    branches:
+      - main
+  workflow_dispatch:
+
+
+env:
+  CI: 1
+  PRISMA_TELEMETRY_INFORMATION: 'prisma-examples test-cockroachdb.yaml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    env:
+      DATABASE_URL:
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start a single CockroachDB instance with Docker
+        env:
+          COCKROACHDB_DOCKER_TAG: 'cockroachdb/cockroach:latest-v21.2'
+        run: |
+          docker pull $COCKROACHDB_DOCKER_TAG
+          docker run -d --name roach --hostname roach -p 26257:26257 -p 8080:8080 -v "${{ github.workspace }}:/app" $COCKROACHDB_DOCKER_TAG start-single-node --insecure
+          sudo apt update && sudo apt install wait-for-it -y
+          wait-for-it -h localhost -p 26257
+      - name: Set up Python
+        # This is the version of the action for setting up Python, not the Python version.
+        uses: actions/setup-python@v4
+        with:
+        # Semantic version range syntax or exact version of a Python version
+        python-version: '3.11.6'
+      - run: pip install -r /app/requirements.txt
+      - run: 
+      - run: 

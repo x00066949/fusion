@@ -1,0 +1,6 @@
+Flask
+psycopg2-binary
+sqlalchemy
+sqlalchemy-cockroachdb
+mock-alchemy>=0.1.0,<0.2.0
+pytest

@@ -1,0 +1,3 @@
+conf:
+  cache: "2Gi"
+  max-sql-memory: "2Gi"
