@@ -12,7 +12,7 @@ class Movies(Base):
     """
     __tablename__ = 'movies'
     #id = Column(UUID(as_uuid=True), primary_key=True)
-    id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")) # auto generated PK because no single unique attribute. Might be worth considering a composite pk  
+    id = Column(Integer, primary_key=True, server_default=text("unique_rowid()")) # auto generated PK because no single unique attribute. Might be worth considering a composite pk  
     title = Column(String, nullable=False) 
     year = Column(Integer) 
     extract = Column(String)

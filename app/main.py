@@ -1,17 +1,15 @@
-from flask import Flask, jsonify
+from flask import Flask
 from types import SimpleNamespace
 
-import logging
 import json
 from os import environ
+import logging
 
-from sqlalchemy import create_engine, func
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy_cockroachdb import run_transaction
 from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
-from sqlalchemy.dialects import postgresql
 
-
+from __init__ import get_db
 from models import Movies
 from row_encoder import AlchemyEncoder
 
@@ -20,33 +18,9 @@ app = Flask(__name__)
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-def db_session():
-    """Setting up database connection session
-    Returns a Cockroach db session for running queries against cockroach db running in same cluster
-    """
-    db_user=environ["DB_USER"]
-    db_password=environ["DB_PASSWORD"]
-
-    logging.info("connecting to db")    
-    db_uri="cockroachdb://"+db_user+":"+db_password+"@my-release-cockroachdb-public.default.svc.cluster.local:26257/movies"
-
-    #in a real production environment, i'd opt for ssl cert auth (over username+password auth) in which case, the uri would be:
-    #db_uri="cockroachdb://my-release-cockroachdb-public.default.svc.cluster.local:26257/movies?sslmode=require&sslrootcert=/cockroach/cockroach-certs/client.root.crt&sslcert=/cockroach/cockroach-certs/ca.crt&sslkey=/cockroach/cockroach-certs/client.root.key"
-    
-    try:        
-        engine = create_engine(db_uri)
-    except Exception as e:
-        logging.info("Failed to connect to database.")
-        logging.info(f"{e}")
-    
-    logging.info("connected to db")
-
-    Session=sessionmaker(bind=engine)
-    return Session()
-
 @app.route("/", methods=["GET"])
 def hello():
-    db_session()
+    get_db()
     return "Welcome to the Movies Data API"
 
 @app.route('/year/<int:year>', methods=["GET"])
@@ -54,7 +28,7 @@ def get_movies_by_year(year):
     """Find movies released in a given year
     """
 
-    session = db_session()    
+    session = get_db() 
 
     result = session.query(Movies).filter(Movies.year == year).all()
     result_dict = json.dumps(result, cls=AlchemyEncoder)
@@ -73,7 +47,7 @@ def get_movies_by_title(title):
 
     title=title.replace("_", " ")
 
-    session = db_session()
+    session = get_db() 
 
     try:
         result = session.query(Movies).filter(Movies.title.icontains(title)).all()
@@ -81,7 +55,6 @@ def get_movies_by_title(title):
         logging.info("No result was found")
     except MultipleResultsFound:
         logging.info("Multiple results were found")
-        logging.info(result)
 
     result_dict = json.dumps(result, cls=AlchemyEncoder)
 
@@ -109,7 +82,7 @@ def get_movies_by_cast(first,middle, last):
 
     logging.info(full_name)
 
-    session = db_session()
+    session = get_db() 
 
     result = session.query(Movies).filter(Movies.cast_list.contains([full_name])).all()    
     result_dict = json.dumps(result, cls=AlchemyEncoder)
@@ -119,12 +92,9 @@ def get_movies_by_cast(first,middle, last):
 @app.route('/genre/<genre>', methods=["GET"])
 def get_movies_by_genre(genre):
     """get movies in a specified genre
-    Works  for cast with Singlename, Firstname Surname and Firstname Middlename Surname only. 
-    I am aware that this won't work for cast more that 3 names or if capitalization is in the middle. 
-    (There is room for improvement here. Can improve the query so the query returns case insensitive result)
     """
 
-    session = db_session()   
+    session = get_db()   
 
     result = session.query(Movies).filter(Movies.genres.contains([genre.capitalize()])).all()
     result_dict = json.dumps(result, cls=AlchemyEncoder)
@@ -179,7 +149,7 @@ def assign_column(raw_movie_object):
 @app.route('/addall', methods=["GET"])
 def add_movies():
     """ a function that adds all movies from movies.json to a CockroachDB table
-    this is mostly used to load test data initially so will only br run once to allow us to run queries against our local cluster
+    this is used to load test data initially so will only br run once to allow us to run queries against our local cluster
     """
     movie_file = open('movies.json')
     movies_data = json.load(movie_file)
@@ -191,9 +161,9 @@ def add_movies():
         row = assign_column(x)
         movie_rows.append(row)
 
-        logging.info('%s added to db',x.title )
+        logging.info('adding %s to db',x.title )
     
-    session = db_session()
+    session = get_db() 
 
     session.add_all(movie_rows)   
     session.commit()
